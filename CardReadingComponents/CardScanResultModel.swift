@@ -10,7 +10,6 @@ import Vision
 import VisionKit
 
 class CardScanResultModel: Identifiable {
-    static var idRegex: any RegexComponent { /^[A-Za-z]{1,3}\d+$/ }
     static let nameFormatter: PersonNameComponentsFormatter = {
         let formatter = PersonNameComponentsFormatter()
         
@@ -507,20 +506,17 @@ class CardScanResultModel: Identifiable {
     }
     
     enum CardType {
-        case creditCard
         case stateID
         case medicalID
         
         var relevantWords: [String] {
             switch self {
-            case .creditCard:
-                return []
             case .medicalID:
                 return CardScanResultModel.IssueingState.allCases.reduce([], { partialResult, state in
                     return Array(Set(partialResult + [state.rawVaule] + state.knownMedicalText))
                 })
             case .stateID:
-                return CardScanResultModel.IssueingState.allCases.map({ $0.displayString })
+                return Array(Set(CardScanResultModel.IssueingState.allCases.map({ $0.displayString }) + ["Driver's", "Liscense", "State", "ID"]))
             }
         }
     }
@@ -531,22 +527,20 @@ class CardScanResultModel: Identifiable {
     let id = UUID()
     let image: CGImage
     let type: CardType
-    var cardNumber: String?
+    var licenseNumber: String?
     var expirationDate: String?
     var issueingState: IssueingState?
     var caregiverIDNumber: String?
     var name: String?
-    var securityCode: String?
     
-    init(image: CGImage, type: CardType, cardNumber: String? = nil, expirationDate: String? = nil, issueingState: IssueingState? = nil, caregiverIDNumber: String? = nil, name: String? = nil, securityCode: String? = nil) {
+    init(image: CGImage, type: CardType, cardNumber: String? = nil, expirationDate: String? = nil, issueingState: IssueingState? = nil, caregiverIDNumber: String? = nil, name: String? = nil) {
         self.image = image
         self.type = type
-        self.cardNumber = cardNumber
+        self.licenseNumber = cardNumber
         self.expirationDate = expirationDate
         self.issueingState = issueingState
         self.caregiverIDNumber = caregiverIDNumber
         self.name = name
-        self.securityCode = securityCode
         
         let handler = VNImageRequestHandler(cgImage: image)
         let request = VNRecognizeTextRequest(completionHandler: self.evaluate(request:error:))
@@ -567,10 +561,14 @@ class CardScanResultModel: Identifiable {
     }
     
     var isComplete: Bool {
-        // Do more data validation here ideally
-        issueingState != nil &&
-        !(cardNumber ?? caregiverIDNumber ?? "").isEmpty &&
-        !(expirationDate ?? "").isEmpty
+        switch type {
+        case .medicalID:
+            issueingState != nil &&
+            !(licenseNumber ?? caregiverIDNumber ?? "").isEmpty &&
+            !(expirationDate ?? "").isEmpty
+        case .stateID:
+            issueingState != nil
+        }
     }
     
     func evaluate(request: VNRequest, error: Error?) {
@@ -581,21 +579,20 @@ class CardScanResultModel: Identifiable {
         let recognizedText = requestResults.compactMap { observation in
             return observation.topCandidates(1).first?.string
         }
-        // Do logic based on what we've read
+        let state = recognizedText.compactMap({ IssueingState(rawValue: $0) }).filter({ state in
+            switch state {
+            case .un:
+                return false
+            default:
+                return true
+            }
+        }).first ?? IssueingState(rawValue: recognizedText.first ?? "")
+        
         switch type {
         case .medicalID:
-            let state = recognizedText.compactMap({ IssueingState(rawValue: $0) }).filter({ state in
-                switch state {
-                case .un:
-                    return false
-                default:
-                    return true
-                }
-            }).first ?? IssueingState(rawValue: recognizedText.first ?? "")
-            
             setupMedicalFields(for: state, with: recognizedText)
         default:
-            print("Nothing yet")
+            self.issueingState = state
         }
     }
     
@@ -631,7 +628,7 @@ class CardScanResultModel: Identifiable {
                     // Is caregiver card
                     caregiverIDNumber = id
                 } else {
-                    cardNumber = id
+                    licenseNumber = id
                 }
                 workingFields.remove(at: idIndex)
             }
@@ -641,7 +638,7 @@ class CardScanResultModel: Identifiable {
                 let id = workingFields[nextIdIndex]
                 // If we already have a caregiver ID BUT we found another ID candidate, override?
                 if let previousID = caregiverIDNumber {
-                    cardNumber = previousID
+                    licenseNumber = previousID
                 }
                 caregiverIDNumber = id
             }
@@ -649,28 +646,27 @@ class CardScanResultModel: Identifiable {
                 expirationDate = workingFields[dateIndex]
                 workingFields.remove(at: dateIndex)
             }
-            if cardNumber == nil && !workingFields.isEmpty, let idIndex = pickBestID(from: workingFields) {
-                cardNumber = workingFields[idIndex]
+            if licenseNumber == nil && !workingFields.isEmpty, let idIndex = pickBestID(from: workingFields) {
+                licenseNumber = workingFields[idIndex]
                 workingFields.remove(at: idIndex)
             }
             
         default:
-            // Default handling
             print("Check")
         }
         if expirationDate == nil && !filteredFields.isEmpty, let dateIndex = pickBestDate(from: filteredFields) {
             expirationDate = filteredFields[dateIndex]
             filteredFields.remove(at: dateIndex)
         }
-        if cardNumber == nil && !filteredFields.isEmpty, let idIndex = pickBestID(from: filteredFields) {
-            cardNumber = filteredFields[idIndex]
+        if licenseNumber == nil && !filteredFields.isEmpty, let idIndex = pickBestID(from: filteredFields) {
+            licenseNumber = filteredFields[idIndex]
             filteredFields.remove(at: idIndex)
         }
         if expirationDate == nil, let dateIndex = pickBestDate(from: results) {
             expirationDate = results[dateIndex]
         }
-        if cardNumber == nil, let idIndex = pickBestID(from: results) {
-            cardNumber = results[idIndex]
+        if licenseNumber == nil, let idIndex = pickBestID(from: results) {
+            licenseNumber = results[idIndex]
         }
 //        let potentialNameIDs: [Int] = filteredFields.compactMap({ $0. })
     }
@@ -684,7 +680,6 @@ class CardScanResultModel: Identifiable {
     }
     
     func pickBestID(from options: [String]) -> Int? {
-//        return options.firstIndex(where: { $0.firstMatch(of: Self.idRegex) != nil })
-        return nil
+        options.firstIndex(where: { $0.firstMatch(of: /^[A-Za-z]{1,3}\d+$/) != nil })
     }
 }

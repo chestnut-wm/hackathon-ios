@@ -24,7 +24,18 @@ struct ContentView: View {
 //                        Text("Item at \(item.timestamp, format: Date.FormatStyle(date: .numeric, time: .standard))")
                         Text("Destination")
                     } label: {
-                        Text("Link")
+                        HStack {
+                            Image(uiImage: UIImage(cgImage: item.image))
+                            VStack {
+                                if let number = item.licenseNumber {
+                                    Text(number)
+                                }
+                                if let name = item.name {
+                                    Text(name)
+                                }
+                            }
+                        }
+                        .padding()
                     }
                 }
                 .onDelete(perform: deleteItems)
@@ -61,7 +72,6 @@ struct ContentView: View {
                     withAnimation {
                         showSheet = false
                     }
-                    showSheet = false
                 }
             }
         }
