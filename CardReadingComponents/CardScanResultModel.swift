@@ -8,6 +8,37 @@ import VisionKit
 
 @available(iOS 17.0, *)
 class CardScanResultModel: Identifiable {
+    static var incompleteSample: CardScanResultModel {
+        .init(
+            image: UIImage(named: "sample")!.cgImage!,
+            type: .medicalID,
+            cardNumber: "p12345",
+            expirationDate: nil,
+            issueingState: nil,
+            caregiverIDNumber: "c1234",
+            name: "Some Name"
+        )
+    }
+    static var completeSample: CardScanResultModel {
+        .init(
+            image: UIImage(named: "sample")!.cgImage!,
+            type: .medicalID,
+            cardNumber: "p12345",
+            expirationDate: "11/18/2025",
+            issueingState: .ma,
+            caregiverIDNumber: "c1234",
+            name: "Some Name"
+        )
+    }
+    static var sampleStateID: CardScanResultModel {
+        .init(
+            image: UIImage(named: "sample")!.cgImage!,
+            type: .stateID,
+            expirationDate: "11/18/2025",
+            issueingState: .ma,
+            name: "Some Name"
+        )
+    }
     static let nameFormatter: PersonNameComponentsFormatter = {
         let formatter = PersonNameComponentsFormatter()
         

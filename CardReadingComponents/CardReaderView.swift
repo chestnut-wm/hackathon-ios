@@ -1,19 +1,40 @@
 //
-//  Copyright © 2024 Weedmaps LLC. All rights reserved.
+//  CardReaderView.swift
+//  CardReadingComponents
+//
+//  Created by Calvin Chestnut on 8/20/24.
 //
 
 import SwiftUI
 import Vision
 import VisionKit
 
-@available(iOS 17.0, *)
 typealias CardReaderResult = (stateID: CardScanResultModel?, medicalID: CardScanResultModel?)
-@available(iOS 17.0, *)
 typealias CardReaderCompletion = ((CardReaderResult) -> Void)
 
+struct CardReaderView: View {
+    
+    private let completion: CardReaderCompletion
+    
+    init(completion: @escaping CardReaderCompletion) {
+        self.completion = completion
+    }
+    
+    var body: some View {
+        // Check simulator
+        if false {
+            DocumentCameraView(completion: completion)
+        } else {
+            EmptyView()
+                .task {
+                    completion((stateID: .sampleStateID, medicalID: .completeSample))
+                }
+        }
+    }
+}
+
 // Constructed with help from https://augmentedcode.io/2019/07/07/scanning-text-using-swiftui-and-vision-on-ios/
-@available(iOS 17.0, *)
-public struct CardReaderView: UIViewControllerRepresentable {
+public struct DocumentCameraView: UIViewControllerRepresentable {
     
     private let completion: CardReaderCompletion
     
@@ -23,13 +44,13 @@ public struct CardReaderView: UIViewControllerRepresentable {
     
     public typealias UIViewControllerType = VNDocumentCameraViewController
     
-    public func makeUIViewController(context: UIViewControllerRepresentableContext<CardReaderView>) -> VNDocumentCameraViewController {
+    public func makeUIViewController(context: UIViewControllerRepresentableContext<DocumentCameraView>) -> VNDocumentCameraViewController {
         let viewController = VNDocumentCameraViewController()
         viewController.delegate = context.coordinator
         return viewController
     }
     
-    public func updateUIViewController(_ uiViewController: VNDocumentCameraViewController, context: UIViewControllerRepresentableContext<CardReaderView>) {
+    public func updateUIViewController(_ uiViewController: VNDocumentCameraViewController, context: UIViewControllerRepresentableContext<DocumentCameraView>) {
     }
     
     public func makeCoordinator() -> Coordinator {
@@ -50,7 +71,7 @@ public struct CardReaderView: UIViewControllerRepresentable {
         })
     }
     
-    public final class Coordinator: NSObject, VNDocumentCameraViewControllerDelegate {
+    final public class Coordinator: NSObject, VNDocumentCameraViewControllerDelegate {
         
         private let completionHandler: ([CardScanResultModel]) -> Void
         
@@ -59,7 +80,13 @@ public struct CardReaderView: UIViewControllerRepresentable {
         }
         
         public func documentCameraViewController(_ controller: VNDocumentCameraViewController, didFinishWith scan: VNDocumentCameraScan) {
-            let images = (0..<scan.pageCount).map({ scan.imageOfPage(at: $0) })
+            let images = {
+                var images: [UIImage] = []
+                for i in 0..<scan.pageCount {
+                    images.append(scan.imageOfPage(at: i))
+                }
+                return images
+            }()
             validateImage(images: images, completion: completionHandler)
         }
         
@@ -74,9 +101,7 @@ public struct CardReaderView: UIViewControllerRepresentable {
         
         func validateImage(images: [UIImage], completion: @escaping ([CardScanResultModel]) -> Void) {
             completion(images.compactMap({
-                guard let cgImage = $0.cgImage else {
-                    return nil
-                }
+                guard let cgImage = $0.cgImage else { return nil }
                 let model = CardScanResultModel(image: cgImage)
                 return model
             }))

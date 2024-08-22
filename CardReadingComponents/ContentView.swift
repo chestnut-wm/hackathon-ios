@@ -63,7 +63,7 @@ struct ContentView: View {
 //            
 //        })
         .sheet(isPresented: $showSheet) {
-            CardReaderView { models in
+            DocumentCameraView { models in
                 if let stateModel = models.stateID {
                     items.append(stateModel)
                 }
