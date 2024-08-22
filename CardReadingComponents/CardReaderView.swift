@@ -59,46 +59,34 @@ struct CardReaderView: View {
                 }
             }
         } else if (stateResult != nil || medicalResult != nil) {
-            VStack {
+            List {
                 Text("Oops, we need a little help")
-                List {
-                    if let stateResult {
-                        Section(NSLocalizedString("Photo ID", comment: "")) {
+                if let stateResult {
+                    Section(NSLocalizedString("Photo ID", comment: "")) {
+                        if stateResult.isComplete {
+                            cardRow(for: stateResult)
+                        } else {
                             Button(action: {
                                 finishModel = stateResult
                             }, label: {
-                                HStack {
-                                    Image(uiImage: UIImage(cgImage: stateResult.image)).resizable().aspectRatio(1.3, contentMode: .fit)
-                                    if stateResult.isComplete {
-                                        Text("No issues")
-                                    } else {
-                                        Text("Needs Direction")
-                                    }
-                                }
-                                .frame(maxHeight: 66)
-                            })
-                        }
-                    }
-                    if let medicalResult {
-                        Section(NSLocalizedString("Medical ID", comment: "")) {
-                            Button(action: {
-                                finishModel = medicalResult
-                            }, label: {
-                                HStack {
-                                    Image(uiImage: UIImage(cgImage: medicalResult.image)).resizable().aspectRatio(1.3, contentMode: .fit)
-                                    if medicalResult.isComplete {
-                                        Text("No issues")
-                                    } else {
-                                        Text("Needs Direction")
-                                    }
-                                }
-                                .frame(maxHeight: 66)
+                                cardRow(for: stateResult)
                             })
                         }
                     }
                 }
-                ProgressView().progressViewStyle(.circular)
-                Text(NSLocalizedString("holding", comment: ""))
+                if let medicalResult {
+                    Section(NSLocalizedString("Medical ID", comment: "")) {
+                        if medicalResult.isComplete {
+                            cardRow(for: medicalResult)
+                        } else {
+                            Button(action: {
+                                finishModel = medicalResult
+                            }, label: {
+                                cardRow(for: medicalResult)
+                            })
+                        }
+                    }
+                }
             }
             .task {
                 withAnimation {
@@ -120,6 +108,19 @@ struct CardReaderView: View {
     }
     
     @ViewBuilder
+    func cardRow(for model: CardScanResultModel) -> some View {
+        HStack {
+            Image(uiImage: UIImage(cgImage: model.image)).resizable().aspectRatio(1.3, contentMode: .fit)
+            if model.isComplete {
+                Text("No issues")
+            } else {
+                Text("Needs help")
+            }
+        }
+        .frame(maxHeight: 66)
+    }
+    
+    @ViewBuilder
     var deviceAppropriateCaptureView: some View {
 #if targetEnvironment(simulator)
         EmptyView()
@@ -137,13 +138,14 @@ struct CardReaderView: View {
     
     @ViewBuilder
     func completeFormView(with model: Binding<CardScanResultModel?>) -> some View {
-        MissingInfoView()
+        MissingInfoView(model: model)
             .presentationDetents([.medium, .large])
     }
     
     @ViewBuilder
     var confirmFormView: some View {
         EmptyView()
+            .presentationDetents([.medium, .large])
             .task {
                 completion((stateID: stateResult, medicalID: medicalResult))
             }

@@ -7,6 +7,9 @@ import SwiftUI
 @available(iOS 17.0, *)
 struct MissingInfoView: View {
     
+    @Binding
+    var model: CardScanResultModel?
+    
     @State private var expirationDate: String = ""
     @State private var issueingState: String = ""
     @State private var licenseID: String = ""
@@ -79,7 +82,10 @@ struct MissingInfoView: View {
 
 @available(iOS 17.0, *)
 struct MissingInfoView_Previews: PreviewProvider {
+    @State
+    static var model: CardScanResultModel? = CardScanResultModel.incompleteSample
+    
     static var previews: some View {
-        MissingInfoView()
+        MissingInfoView(model: $model)
     }
 }
