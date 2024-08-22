@@ -21,15 +21,14 @@ struct CardReaderView: View {
     }
     
     var body: some View {
-        // Check simulator
-        if false {
-            DocumentCameraView(completion: completion)
-        } else {
-            EmptyView()
-                .task {
-                    completion((stateID: .sampleStateID, medicalID: .completeSample))
-                }
-        }
+#if targetEnvironment(simulator)
+        EmptyView()
+            .task {
+                completion((stateID: .sampleStateID, medicalID: .completeSample))
+            }
+#else
+        DocumentCameraView(completion: completion)
+#endif
     }
 }
 
