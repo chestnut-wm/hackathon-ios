@@ -1,23 +1,24 @@
 //
-//  CardReaderView.swift
-//  CardReadingComponents
-//
-//  Created by Calvin Chestnut on 8/20/24.
+//  Copyright © 2024 Weedmaps LLC. All rights reserved.
 //
 
 import SwiftUI
 import Vision
 import VisionKit
 
+@available(iOS 17.0, *)
 typealias CardReaderResult = (stateID: CardScanResultModel?, medicalID: CardScanResultModel?)
+@available(iOS 17.0, *)
+typealias CardReaderCompletion = ((CardReaderResult) -> Void)
 
 // Constructed with help from https://augmentedcode.io/2019/07/07/scanning-text-using-swiftui-and-vision-on-ios/
+@available(iOS 17.0, *)
 public struct CardReaderView: UIViewControllerRepresentable {
     
-    private let completionHandler: (CardReaderResult) -> Void
+    private let completion: CardReaderCompletion
     
-    init(completionHandler: @escaping (CardReaderResult) -> Void) {
-        self.completionHandler = completionHandler
+    init(completion: @escaping CardReaderCompletion) {
+        self.completion = completion
     }
     
     public typealias UIViewControllerType = VNDocumentCameraViewController
@@ -45,11 +46,11 @@ public struct CardReaderView: UIViewControllerRepresentable {
                 }
                 return partialResult?.join(with: newModel) ?? newModel
             }
-            completionHandler((stateID: stateID, medicalID: medicalID))
+            completion((stateID: stateID, medicalID: medicalID))
         })
     }
     
-    final public class Coordinator: NSObject, VNDocumentCameraViewControllerDelegate {
+    public final class Coordinator: NSObject, VNDocumentCameraViewControllerDelegate {
         
         private let completionHandler: ([CardScanResultModel]) -> Void
         
@@ -58,13 +59,7 @@ public struct CardReaderView: UIViewControllerRepresentable {
         }
         
         public func documentCameraViewController(_ controller: VNDocumentCameraViewController, didFinishWith scan: VNDocumentCameraScan) {
-            let images = {
-                var images: [UIImage] = []
-                for i in 0..<scan.pageCount {
-                    images.append(scan.imageOfPage(at: i))
-                }
-                return images
-            }()
+            let images = (0..<scan.pageCount).map({ scan.imageOfPage(at: $0) })
             validateImage(images: images, completion: completionHandler)
         }
         
@@ -79,7 +74,9 @@ public struct CardReaderView: UIViewControllerRepresentable {
         
         func validateImage(images: [UIImage], completion: @escaping ([CardScanResultModel]) -> Void) {
             completion(images.compactMap({
-                guard let cgImage = $0.cgImage else { return nil }
+                guard let cgImage = $0.cgImage else {
+                    return nil
+                }
                 let model = CardScanResultModel(image: cgImage)
                 return model
             }))
