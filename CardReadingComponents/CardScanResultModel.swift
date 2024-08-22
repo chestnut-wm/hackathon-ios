@@ -501,15 +501,17 @@ class CardScanResultModel: Identifiable {
         }
     }
     
-    enum CardType {
-        case stateID
-        case medicalID
+    enum CardType: String, CaseIterable, Identifiable {
+        case stateID = "State ID"
+        case medicalID = "Medical ID"
         
         static var relevantWords: [String] {
             return CardScanResultModel.IssueingState.allCases.reduce([], { partialResult, state in
                 return Array(Set(partialResult + [state.rawVaule] + IssueingState.knownMedicalText + IssueingState.knownLicenseText))
             })
         }
+        
+        var id: String { self.rawValue }
     }
     
     // The temporal string tracker.
