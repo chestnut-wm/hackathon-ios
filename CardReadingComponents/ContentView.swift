@@ -63,12 +63,14 @@ struct ContentView: View {
 //            
 //        })
         .sheet(isPresented: $showSheet) {
-            CardReaderView { model in
-                guard let model else {
-                    return
+            CardReaderView { models in
+                if let stateModel = models.stateID {
+                    items.append(stateModel)
                 }
-                items.append(model)
-                if model.isComplete {
+                if let medicalModel = models.medicalID {
+                    items.append(medicalModel)
+                }
+                if items.contains(where: { $0.isComplete }) {
                     withAnimation {
                         showSheet = false
                     }

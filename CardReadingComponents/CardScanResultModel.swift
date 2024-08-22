@@ -481,27 +481,23 @@ class CardScanResultModel: Identifiable {
             }
         }
         
-        var knownMedicalText: [String] {
-            switch self {
-            case .ma:
-                return [
-                    "Patient",
-                    "Cannabis",
-                    "Control",
-                    "Commission",
-                    "Commonwealth of Massachusetts",
-                    "Medical Program",
-                    "Registration",
-                    "Number",
-                    "ID Card Expiration Date"
-                ]
-            default:
-                return [
-                    "Medical",
-                    "Cannabis",
-                    "Marijuana"
-                ]
-            }
+        static var knownMedicalText: [String] {
+            return [
+                "Patient",
+                "Cannabis",
+                "Control",
+                "Commission",
+                "Commonwealth of Massachusetts",
+                "Medical Program",
+                "Registration",
+                "Number",
+                "ID Card Expiration Date",
+                "Medical",
+                "Marijuana"
+            ]
+        }
+        static var knownLicenseText: [String] {
+            ["Driver's", "Liscense", "State", "ID"]
         }
     }
     
@@ -509,15 +505,10 @@ class CardScanResultModel: Identifiable {
         case stateID
         case medicalID
         
-        var relevantWords: [String] {
-            switch self {
-            case .medicalID:
-                return CardScanResultModel.IssueingState.allCases.reduce([], { partialResult, state in
-                    return Array(Set(partialResult + [state.rawVaule] + state.knownMedicalText))
-                })
-            case .stateID:
-                return Array(Set(CardScanResultModel.IssueingState.allCases.map({ $0.displayString }) + ["Driver's", "Liscense", "State", "ID"]))
-            }
+        static var relevantWords: [String] {
+            return CardScanResultModel.IssueingState.allCases.reduce([], { partialResult, state in
+                return Array(Set(partialResult + [state.rawVaule] + IssueingState.knownMedicalText + IssueingState.knownLicenseText))
+            })
         }
     }
     
@@ -526,14 +517,14 @@ class CardScanResultModel: Identifiable {
     
     let id = UUID()
     let image: CGImage
-    let type: CardType
+    var type: CardType?
     var licenseNumber: String?
     var expirationDate: String?
     var issueingState: IssueingState?
     var caregiverIDNumber: String?
     var name: String?
     
-    init(image: CGImage, type: CardType, cardNumber: String? = nil, expirationDate: String? = nil, issueingState: IssueingState? = nil, caregiverIDNumber: String? = nil, name: String? = nil) {
+    init(image: CGImage, type: CardType? = nil, cardNumber: String? = nil, expirationDate: String? = nil, issueingState: IssueingState? = nil, caregiverIDNumber: String? = nil, name: String? = nil) {
         self.image = image
         self.type = type
         self.licenseNumber = cardNumber
@@ -542,32 +533,37 @@ class CardScanResultModel: Identifiable {
         self.caregiverIDNumber = caregiverIDNumber
         self.name = name
         
-        let handler = VNImageRequestHandler(cgImage: image)
-        let request = VNRecognizeTextRequest(completionHandler: self.evaluate(request:error:))
-        request.recognitionLevel = .accurate
-        request.automaticallyDetectsLanguage = false
-        request.customWords = type.relevantWords
-        do {
-            try handler.perform(
-                [
-                    VNRecognizeTextRequest(
-                        completionHandler: self.evaluate(request:error:)
-                    )
-                ]
-            )
-        } catch {
-            print("Handle error")
+        if !isComplete {
+            let handler = VNImageRequestHandler(cgImage: image)
+            let request = VNRecognizeTextRequest(completionHandler: self.evaluate(request:error:))
+            request.recognitionLevel = .accurate
+            request.automaticallyDetectsLanguage = false
+            request.customWords = CardType.relevantWords
+            do {
+                try handler.perform(
+                    [
+                        VNRecognizeTextRequest(
+                            completionHandler: self.evaluate(request:error:)
+                        )
+                    ]
+                )
+            } catch {
+                print("Handle error")
+            }
         }
     }
     
     var isComplete: Bool {
+        guard let type else {
+            return false
+        }
         switch type {
         case .medicalID:
-            issueingState != nil &&
+            return issueingState != nil &&
             !(licenseNumber ?? caregiverIDNumber ?? "").isEmpty &&
             !(expirationDate ?? "").isEmpty
         case .stateID:
-            issueingState != nil
+            return issueingState != nil
         }
     }
     
@@ -578,6 +574,12 @@ class CardScanResultModel: Identifiable {
         else { return }
         let recognizedText = requestResults.compactMap { observation in
             return observation.topCandidates(1).first?.string
+        }
+        
+        if recognizedText.contains(where: { IssueingState.knownMedicalText.contains($0) }) {
+            type = .medicalID
+        } else {
+            type = .stateID
         }
         let state = recognizedText.compactMap({ IssueingState(rawValue: $0) }).filter({ state in
             switch state {
@@ -598,7 +600,7 @@ class CardScanResultModel: Identifiable {
     
     func setupMedicalFields(for state: IssueingState, with results: [String]) {
         var filteredFields = results.filter({ result in
-            !state.knownMedicalText.map({ $0.lowercased() }).contains(result.lowercased())
+            !IssueingState.knownMedicalText.map({ $0.lowercased() }).contains(result.lowercased())
         })
         var workingFields = filteredFields
         issueingState = state
@@ -681,5 +683,50 @@ class CardScanResultModel: Identifiable {
     
     func pickBestID(from options: [String]) -> Int? {
         options.firstIndex(where: { $0.firstMatch(of: /^[A-Za-z]{1,3}\d+$/) != nil })
+    }
+    
+    func join(with other: CardScanResultModel) -> CardScanResultModel {
+        guard other.type == type, type == .medicalID else {
+            return self
+        }
+        if other.isComplete && !isComplete {
+            return other
+        }
+        var otherPreferred = 0
+        var preferredNumber = licenseNumber
+        if let otherCard = other.licenseNumber, (preferredNumber ?? "").isEmpty {
+            preferredNumber = otherCard
+            otherPreferred += 1
+        }
+        var preferredCaregiver = caregiverIDNumber
+        if let otherCaregiver = other.caregiverIDNumber, (preferredCaregiver ?? "").isEmpty {
+            preferredCaregiver = otherCaregiver
+            otherPreferred += 1
+        }
+        var preferredExpiration = expirationDate
+        if let otherDate = other.expirationDate, (preferredExpiration ?? "").isEmpty {
+            preferredExpiration = otherDate
+            otherPreferred += 1
+        }
+        var preferredState = issueingState
+        if let otherDate = other.issueingState, preferredState == nil {
+            preferredState = otherDate
+            otherPreferred += 1
+        }
+        var preferredName = name
+        if let otherName = other.name, (preferredName ?? "").isEmpty {
+            preferredName = otherName
+            otherPreferred += 1
+        }
+        
+        return CardScanResultModel(
+            image: otherPreferred > 2 ? other.image : image,
+            type: self.type,
+            cardNumber: preferredNumber,
+            expirationDate: preferredExpiration,
+            issueingState: preferredState,
+            caregiverIDNumber: preferredCaregiver,
+            name: preferredName
+        )
     }
 }

@@ -9,15 +9,14 @@ import SwiftUI
 import Vision
 import VisionKit
 
+typealias CardReaderResult = (stateID: CardScanResultModel?, medicalID: CardScanResultModel?)
 
 // Constructed with help from https://augmentedcode.io/2019/07/07/scanning-text-using-swiftui-and-vision-on-ios/
 public struct CardReaderView: UIViewControllerRepresentable {
     
-    let cardType: CardScanResultModel.CardType
-    private let completionHandler: (CardScanResultModel?) -> Void
+    private let completionHandler: (CardReaderResult) -> Void
     
-    init(_ type: CardScanResultModel.CardType = .medicalID, completionHandler: @escaping (CardScanResultModel?) -> Void) {
-        self.cardType = type
+    init(completionHandler: @escaping (CardReaderResult) -> Void) {
         self.completionHandler = completionHandler
     }
     
@@ -33,40 +32,57 @@ public struct CardReaderView: UIViewControllerRepresentable {
     }
     
     public func makeCoordinator() -> Coordinator {
-        Coordinator(cardType, completionHandler: completionHandler)
+        Coordinator(completionHandler: { models in
+            let medicalID: CardScanResultModel? = models.reduce(nil) { partialResult, newModel in
+                guard newModel.type == .medicalID else {
+                    return partialResult
+                }
+                return partialResult?.join(with: newModel) ?? newModel
+            }
+            let stateID: CardScanResultModel? = models.reduce(nil) { partialResult, newModel in
+                guard newModel.type == .stateID else {
+                    return partialResult
+                }
+                return partialResult?.join(with: newModel) ?? newModel
+            }
+            completionHandler((stateID: stateID, medicalID: medicalID))
+        })
     }
     
     final public class Coordinator: NSObject, VNDocumentCameraViewControllerDelegate {
         
-        let cardType: CardScanResultModel.CardType
-        private let completionHandler: (CardScanResultModel?) -> Void
+        private let completionHandler: ([CardScanResultModel]) -> Void
         
-        init(_ type: CardScanResultModel.CardType = .medicalID, completionHandler: @escaping (CardScanResultModel?) -> Void) {
-            self.cardType = type
+        init(completionHandler: @escaping ([CardScanResultModel]) -> Void) {
             self.completionHandler = completionHandler
         }
         
         public func documentCameraViewController(_ controller: VNDocumentCameraViewController, didFinishWith scan: VNDocumentCameraScan) {
-            print("Document camera view controller did finish with ", scan)
-            let image = scan.imageOfPage(at: 0)
-            validateImage(image: image, completion: completionHandler)
+            let images = {
+                var images: [UIImage] = []
+                for i in 0..<scan.pageCount {
+                    images.append(scan.imageOfPage(at: i))
+                }
+                return images
+            }()
+            validateImage(images: images, completion: completionHandler)
         }
         
         public func documentCameraViewControllerDidCancel(_ controller: VNDocumentCameraViewController) {
-            completionHandler(nil)
+            completionHandler([])
         }
         
         public func documentCameraViewController(_ controller: VNDocumentCameraViewController, didFailWithError error: Error) {
             print("Document camera view controller did finish with error ", error)
-            completionHandler(nil)
+            completionHandler([])
         }
         
-        func validateImage(image: UIImage?, completion: @escaping (CardScanResultModel?) -> Void) {
-            guard let cgImage = image?.cgImage else { return completion(nil) }
-            
-            let model = CardScanResultModel(image: cgImage, type: cardType)
-            
-            completion(model)
+        func validateImage(images: [UIImage], completion: @escaping ([CardScanResultModel]) -> Void) {
+            completion(images.compactMap({
+                guard let cgImage = $0.cgImage else { return nil }
+                let model = CardScanResultModel(image: cgImage)
+                return model
+            }))
         }
     }
 }
