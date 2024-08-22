@@ -107,7 +107,7 @@ class CardScanResultModel: Identifiable {
         self.caregiverIDNumber = caregiverIDNumber
         self.name = name
         
-        if !isComplete {
+        if !isComplete && type == nil {
             let handler = VNImageRequestHandler(cgImage: image)
             let request = VNRecognizeTextRequest(completionHandler: self.evaluate(request:error:))
             request.recognitionLevel = .accurate
@@ -133,9 +133,7 @@ class CardScanResultModel: Identifiable {
         }
         switch type {
         case .medicalID:
-            return issueingState != nil &&
-            !(licenseNumber ?? caregiverIDNumber ?? "").isEmpty &&
-            !(expirationDate ?? "").isEmpty
+            return !(issueingState == nil || (licenseNumber ?? caregiverIDNumber ?? "").isEmpty || (expirationDate ?? "").isEmpty)
         case .stateID:
             return issueingState != nil
         }
