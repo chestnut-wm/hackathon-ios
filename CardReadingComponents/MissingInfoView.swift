@@ -7,23 +7,22 @@ import Foundation
 
 final class MissingInfoViewModel: ObservableObject {
     
-    @Published public var expirationDate: Date
+    @Published public var expirationDate: String
     @Published public var issueingState: String
     @Published public var licenseID: String
-    @Published public var dateOfBirth: Date
-    @Published public var selectedIDType: CardScanResultModel.CardType
-    @Published public var selectedDate: Date
     @Published public var careTakerID: String
     @Published public var currentStepIndex: Int = 0
     
-    init(expirationDate: Date, issueingState: String, licenseID: String, dateOfBirth: Date, selectedIDType: CardScanResultModel.CardType, selectedDate: Date, careTakerId: String) {
-        self.expirationDate = expirationDate
-        self.issueingState = issueingState
-        self.licenseID = licenseID
-        self.dateOfBirth = dateOfBirth
-        self.selectedIDType = selectedIDType
-        self.selectedDate = selectedDate
-        self.careTakerID = careTakerId
+    @Published public var result: CardScanResultModel?
+    
+    let createdBy: CardScanResultModel?
+    
+    init(_ model: CardScanResultModel?) {
+        self.createdBy = model
+        self.expirationDate = ""
+        self.issueingState = ""
+        self.licenseID = ""
+        self.careTakerID = ""
     }
     
     public var steps: [QuestionaireScreen] = [.licenseId, .careTakerId, .expirationDate]
@@ -40,16 +39,29 @@ final class MissingInfoViewModel: ObservableObject {
         }
     }
     
-    func submit() { }
+    var asResultModel: CardScanResultModel? {
+        guard let createdBy else {
+            return nil
+        }
+        return .init(
+            image: createdBy.image,
+            type: createdBy.type,
+            cardNumber: licenseID.isEmpty ? createdBy.licenseNumber : licenseID,
+            expirationDate: expirationDate.isEmpty ? createdBy.expirationDate : expirationDate,
+            issueingState: issueingState.isEmpty ? createdBy.issueingState : CardIssuingMunicipality(rawValue: issueingState),
+            caregiverIDNumber: careTakerID.isEmpty ? createdBy.caregiverIDNumber : careTakerID,
+            name: createdBy.name
+        )
+    }
+    
+    func submit() {
+        result = asResultModel
+    }
     
     func enter<T>(value: T) {
         switch currentStep {
-        case .idType:
-            if let value = value as? CardScanResultModel.CardType {
-                self.selectedIDType = value
-            }
         case .expirationDate:
-            if let value = value as? Date {
+            if let value = value as? String {
                 self.expirationDate = value
             }
         case .licenseId:
@@ -70,7 +82,7 @@ struct MissingInfoView: View {
     @Binding
     var model: CardScanResultModel?
   
-    @StateObject private var viewModel: MissingInfoViewModel
+    @ObservedObject private var viewModel: MissingInfoViewModel
     @State private var showNextStep: Bool = false
     
     @State private var stringValue: String = ""
@@ -83,13 +95,17 @@ struct MissingInfoView: View {
         return formatter
     }()
     
-    init(viewModel: MissingInfoViewModel) {
-        self.viewModel = viewModel
+    init(model: Binding<CardScanResultModel?>) {
+        self._model = model
+        self.viewModel = .init(model.wrappedValue)
     }
     
     var body: some View {
         NavigationStack {
             MissingInfoDetailsView(viewModel: viewModel)
+        }
+        .onReceive(viewModel.$result.dropFirst()) { result in
+            self.model = result
         }
     }
 }
@@ -143,11 +159,11 @@ struct MissingInfoDetailsView: View {
                     .cornerRadius(8)
             }
             
-            NavigationLink(
-                destination: MissingInfoView(viewModel: viewModel),
-                isActive: $showNextStep,
-                label: { EmptyView() }
-            )
+//            NavigationLink(
+//                destination: MissingInfoView(model: viewModel),
+//                isActive: $showNextStep,
+//                label: { EmptyView() }
+//            )
         }
         .padding()
     }
@@ -155,14 +171,6 @@ struct MissingInfoDetailsView: View {
     @ViewBuilder
     private func content() -> some View {
         switch viewModel.currentStep {
-        case .idType:
-            Picker(viewModel.currentStep.placeHolderText, selection: $cardValue) {
-                ForEach(CardScanResultModel.CardType.allCases) { idType in
-                    Text(idType.rawValue).tag(idType)
-                }
-            }
-            .pickerStyle(SegmentedPickerStyle())
-            .padding(.bottom, 10)
         case .expirationDate:
             DatePicker(
                 viewModel.currentStep.placeHolderText,
@@ -175,6 +183,7 @@ struct MissingInfoDetailsView: View {
                 .textFieldStyle(RoundedBorderTextFieldStyle())
                 .padding(.bottom, 10)
         }
+    }
 }
 
 @available(iOS 17.0, *)

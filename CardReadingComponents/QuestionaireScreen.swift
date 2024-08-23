@@ -1,15 +1,12 @@
 
 
 public enum QuestionaireScreen {
-    case idType
     case expirationDate
     case licenseId
     case careTakerId
     
     var title: String {
         switch self {
-        case .idType:
-            "Please select the card type:"
         case .expirationDate:
             "Please enter the expiration date:"
         case .licenseId:
@@ -21,8 +18,6 @@ public enum QuestionaireScreen {
     
     var placeHolderText: String {
         switch self {
-        case .idType:
-            "Card type"
         case .expirationDate:
             "Expiration date"
         case .licenseId:
