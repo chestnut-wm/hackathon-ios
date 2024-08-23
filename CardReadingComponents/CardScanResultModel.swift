@@ -136,7 +136,7 @@ class CardScanResultModel: Identifiable {
         }
         switch type {
         case .medicalID:
-            return !(issueingState == nil || (licenseNumber ?? caregiverIDNumber ?? "").isEmpty || (expirationDate ?? "").isEmpty)
+            return !((licenseNumber ?? caregiverIDNumber ?? "").isEmpty || (expirationDate ?? "").isEmpty)
         case .stateID:
             return issueingState != nil
         }
@@ -277,10 +277,10 @@ class CardScanResultModel: Identifiable {
     
     func pickBestID(with pattern: String = "^[A-Za-z]{1,3}\\d+$", from options: [String]) -> Int? {
         options.firstIndex(where: { option in
-            guard let regex = try? NSRegularExpression(pattern: pattern, options: []), let range = NSRange(option) else {
+            guard let regex = try? NSRegularExpression(pattern: pattern, options: []) else {
                 return false
             }
-            return regex.numberOfMatches(in: option, options: [], range: range) != 0
+            return regex.numberOfMatches(in: option, options: [], range: NSRange(option.startIndex..., in: option)) != 0
         })
     }
     
@@ -319,8 +319,8 @@ class CardScanResultModel: Identifiable {
         }
         
         return CardScanResultModel(
-            image: otherPreferred > 2 ? other.image : image,
-            type: self.type,
+            image: workingFields.count > other.workingFields.count ? image : other.image,
+            type: type,
             cardNumber: preferredNumber,
             expirationDate: preferredExpiration,
             issueingState: preferredState,

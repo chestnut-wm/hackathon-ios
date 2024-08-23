@@ -18,8 +18,6 @@ struct CardReaderView: View {
     var presentingCapture: Bool = false
     @State
     var presentingFinish: Bool = false
-    @State
-    var presentingConfirm: Bool = false
     
     // Migrate to DataState ideally
     @State
@@ -43,22 +41,21 @@ struct CardReaderView: View {
             .sheet(item: $finishModel) { model in
                 completeFormView(with: $finishModel)
             }
+            .onReceive(finishModel.publisher.dropFirst(), perform: { _ in
+                switch finishModel?.type {
+                case .medicalID:
+                    medicalResult = finishModel
+                case .stateID:
+                    stateResult = finishModel
+                default:
+                    print("Outch")
+                }
+            })
     }
     
     @ViewBuilder
     var appropriateStateView: some View {
-        if (stateResult != nil || medicalResult != nil) && (stateResult?.isComplete ?? true && medicalResult?.isComplete ?? true) {
-            VStack {
-                ProgressView().progressViewStyle(.circular)
-                Text(NSLocalizedString("release", comment: ""))
-            }
-            .task {
-                withAnimation {
-                    presentingFinish = false
-                    presentingConfirm = true
-                }
-            }
-        } else if (stateResult != nil || medicalResult != nil) {
+        if (stateResult != nil || medicalResult != nil) {
             List {
                 if !(stateResult?.isComplete ?? false) || !(medicalResult?.isComplete ?? false) {
                     Section(NSLocalizedString("Needs attention", comment: "")) {
@@ -68,6 +65,17 @@ struct CardReaderView: View {
                             }, label: {
                                 cardRow(for: stateResult)
                             })
+                            .buttonStyle(.plain)
+                            .swipeActions {
+                                Button {
+                                    withAnimation {
+                                        self.stateResult = nil
+                                    }
+                                } label: {
+                                    Label("Delete", systemImage: "trash")
+                                }
+                                .tint(.red)
+                            }
                         }
                         if let medicalResult, !medicalResult.isComplete {
                             Button(action: {
@@ -75,6 +83,17 @@ struct CardReaderView: View {
                             }, label: {
                                 cardRow(for: medicalResult)
                             })
+                            .buttonStyle(.plain)
+                            .swipeActions {
+                                Button {
+                                    withAnimation {
+                                        self.medicalResult = nil
+                                    }
+                                } label: {
+                                    Label("Delete", systemImage: "trash")
+                                }
+                                .tint(.red)
+                            }
                         }
                     }
                 }
@@ -109,14 +128,30 @@ struct CardReaderView: View {
     @ViewBuilder
     func cardRow(for model: CardScanResultModel) -> some View {
         HStack {
-            Image(uiImage: UIImage(cgImage: model.image)).resizable().aspectRatio(1.3, contentMode: .fit)
-            if let type = model.type?.displayName {
-                Text(type)
+            Image(uiImage: UIImage(cgImage: model.image)).resizable().aspectRatio(1.3, contentMode: .fit).frame(width: 120)
+            VStack(alignment: .leading) {
+                if let type = model.type?.displayName {
+                    Text(type)
+                        .font(.headline)
+                }
+                if let state = model.issueingState {
+                    Text(state.displayString)
+                        .font(.subheadline)
+                }
+                if let id = model.licenseNumber {
+                    Text("License#: \(id)")
+                }
+                if let id = model.caregiverIDNumber {
+                    Text("Caregiver#: \(id)")
+                }
+                if let id = model.expirationDate, let date = CardScanResultModel.standardDateFormatter.date(from: id) {
+                    Text("Expiration: \(CardScanResultModel.standardDateFormatter.string(from: date))")
+                }
             }
+            .frame(alignment: .top)
             Spacer()
             Image(systemName: model.isComplete ? "checkmark.circle.fill" : "exclamationmark.triangle.fill").foregroundStyle(model.isComplete ? Color.gray : Color.red)
         }
-        .frame(maxHeight: 66)
     }
     
     @ViewBuilder
