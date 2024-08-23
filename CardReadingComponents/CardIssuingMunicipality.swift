@@ -5,7 +5,7 @@
 import Foundation
 
 @available(iOS 17.0, *)
-enum CardIssuingMunicipality: CaseIterable {
+enum CardIssuingMunicipality: CaseIterable, Hashable {
     static var allCases: [CardIssuingMunicipality] {
         [
             .al, .ak, .az, .ar, .as, .ca, .co, .ct, .de, .dc, .fl, .ga, .gu, .hi,

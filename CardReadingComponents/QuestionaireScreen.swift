@@ -4,6 +4,7 @@ public enum QuestionaireScreen {
     case expirationDate
     case licenseId
     case careTakerId
+    case issueingState
     
     var title: String {
         switch self {
@@ -13,6 +14,8 @@ public enum QuestionaireScreen {
             "Please enter your drivers license id:"
         case .careTakerId:
             "Please enter your care taker id:"
+        case .issueingState:
+            "Please enter the issueing state:"
         }
     }
     
@@ -24,6 +27,8 @@ public enum QuestionaireScreen {
             "Drivers license id"
         case .careTakerId:
             "Caretaker id"
+        case .issueingState:
+            "Issueing state"
         }
     }
 }

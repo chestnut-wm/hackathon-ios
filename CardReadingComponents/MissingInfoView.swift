@@ -25,7 +25,7 @@ final class MissingInfoViewModel: ObservableObject {
         self.careTakerID = ""
     }
     
-    public var steps: [QuestionaireScreen] = [.licenseId, .careTakerId, .expirationDate]
+    public var steps: [QuestionaireScreen] = [.licenseId, .careTakerId, .expirationDate, .issueingState]
     
     public var currentStep: QuestionaireScreen {
         steps[currentStepIndex]
@@ -61,8 +61,8 @@ final class MissingInfoViewModel: ObservableObject {
     func enter<T>(value: T) {
         switch currentStep {
         case .expirationDate:
-            if let value = value as? String {
-                self.expirationDate = value
+            if let value = value as? Date {
+                self.expirationDate = formatDate(value)
             }
         case .licenseId:
             if let value = value as? String {
@@ -72,7 +72,18 @@ final class MissingInfoViewModel: ObservableObject {
             if let value = value as? String {
                 self.careTakerID = value
             }
+        case .issueingState:
+            if let value = value as? String {
+                self.issueingState = value
+            }
         }
+    }
+    
+    func formatDate(_ value: Date) -> String {
+        let dateFormatter = DateFormatter()
+        dateFormatter.dateFormat = "M/d/yy"
+        
+        return dateFormatter.string(from: value)
     }
 }
 
@@ -150,6 +161,10 @@ struct MissingInfoDetailsView: View {
                 
                 viewModel.goToNextStep()
                 showNextStep = true
+                
+                self.stringValue = ""
+                self.cardValue = nil
+                self.dateValue = Date()
             }) {
                 Text(viewModel.currentStepIndex < viewModel.steps.count - 1 ? "Next" : "Submit")
                     .frame(maxWidth: .infinity)
@@ -158,12 +173,6 @@ struct MissingInfoDetailsView: View {
                     .foregroundColor(.white)
                     .cornerRadius(8)
             }
-            
-//            NavigationLink(
-//                destination: MissingInfoView(model: viewModel),
-//                isActive: $showNextStep,
-//                label: { EmptyView() }
-//            )
         }
         .padding()
     }
@@ -178,6 +187,13 @@ struct MissingInfoDetailsView: View {
                 displayedComponents: [.date]
             )
             .padding(.bottom, 10)
+        case .issueingState:
+            Picker("Select a state", selection: $stringValue) {
+                ForEach(CardIssuingMunicipality.allCases, id: \.self) { state in
+                    Text(state.displayString).tag(state.rawVaule)
+                }
+            }
+            .pickerStyle(WheelPickerStyle())
         default:
             TextField(viewModel.currentStep.placeHolderText, text: $stringValue)
                 .textFieldStyle(RoundedBorderTextFieldStyle())
