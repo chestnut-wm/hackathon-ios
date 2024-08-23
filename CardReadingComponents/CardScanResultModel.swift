@@ -83,10 +83,11 @@ class CardScanResultModel: Identifiable {
         ["Driver's", "Liscense", "State", "ID"]
     }
     enum CardType: String, CaseIterable, Identifiable {
-        case stateID = "State ID"
+        case stateID = "Photo ID"
         case medicalID = "Medical ID"
             
         var id: String { self.rawValue }
+        var displayName: String { self.rawValue }
     }
     
     let id = UUID()
@@ -98,6 +99,8 @@ class CardScanResultModel: Identifiable {
     var caregiverIDNumber: String?
     var name: String?
     
+    var workingFields: [String] = []
+    
     init(image: CGImage, type: CardType? = nil, cardNumber: String? = nil, expirationDate: String? = nil, issueingState: CardIssuingMunicipality? = nil, caregiverIDNumber: String? = nil, name: String? = nil) {
         self.image = image
         self.type = type
@@ -107,7 +110,7 @@ class CardScanResultModel: Identifiable {
         self.caregiverIDNumber = caregiverIDNumber
         self.name = name
         
-        if !isComplete {
+        if !isComplete && type == nil {
             let handler = VNImageRequestHandler(cgImage: image)
             let request = VNRecognizeTextRequest(completionHandler: self.evaluate(request:error:))
             request.recognitionLevel = .accurate
@@ -133,9 +136,7 @@ class CardScanResultModel: Identifiable {
         }
         switch type {
         case .medicalID:
-            return issueingState != nil &&
-            !(licenseNumber ?? caregiverIDNumber ?? "").isEmpty &&
-            !(expirationDate ?? "").isEmpty
+            return !(issueingState == nil || (licenseNumber ?? caregiverIDNumber ?? "").isEmpty || (expirationDate ?? "").isEmpty)
         case .stateID:
             return issueingState != nil
         }
@@ -177,7 +178,7 @@ class CardScanResultModel: Identifiable {
         var filteredFields = results.filter({ result in
             !Self.knownMedicalText.map({ $0.lowercased() }).contains(result.lowercased())
         })
-        var workingFields = filteredFields
+        workingFields = filteredFields
         issueingState = state
         
         if let firstDate = workingFields.firstIndex(where: { Self.standardDateFormatter.date(from: $0) != nil }) {

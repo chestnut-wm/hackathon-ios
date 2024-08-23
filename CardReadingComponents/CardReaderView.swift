@@ -14,6 +14,22 @@ typealias CardReaderCompletion = ((CardReaderResult) -> Void)
 
 struct CardReaderView: View {
     
+    @State
+    var presentingCapture: Bool = false
+    @State
+    var presentingFinish: Bool = false
+    @State
+    var presentingConfirm: Bool = false
+    
+    // Migrate to DataState ideally
+    @State
+    var stateResult: CardScanResultModel?
+    @State
+    var medicalResult: CardScanResultModel?
+    
+    @State
+    var finishModel: CardScanResultModel?
+    
     private let completion: CardReaderCompletion
     
     init(completion: @escaping CardReaderCompletion) {
@@ -21,14 +37,117 @@ struct CardReaderView: View {
     }
     
     var body: some View {
+        appropriateStateView
+            .presentationDetents([.medium])
+            .sheet(isPresented: $presentingCapture, content: { deviceAppropriateCaptureView })
+            .sheet(item: $finishModel) { model in
+                completeFormView(with: $finishModel)
+            }
+    }
+    
+    @ViewBuilder
+    var appropriateStateView: some View {
+        if (stateResult != nil || medicalResult != nil) && (stateResult?.isComplete ?? true && medicalResult?.isComplete ?? true) {
+            VStack {
+                ProgressView().progressViewStyle(.circular)
+                Text(NSLocalizedString("release", comment: ""))
+            }
+            .task {
+                withAnimation {
+                    presentingFinish = false
+                    presentingConfirm = true
+                }
+            }
+        } else if (stateResult != nil || medicalResult != nil) {
+            List {
+                if !(stateResult?.isComplete ?? false) || !(medicalResult?.isComplete ?? false) {
+                    Section(NSLocalizedString("Needs attention", comment: "")) {
+                        if let stateResult, !stateResult.isComplete {
+                            Button(action: {
+                                finishModel = stateResult
+                            }, label: {
+                                cardRow(for: stateResult)
+                            })
+                        }
+                        if let medicalResult, !medicalResult.isComplete {
+                            Button(action: {
+                                finishModel = medicalResult
+                            }, label: {
+                                cardRow(for: medicalResult)
+                            })
+                        }
+                    }
+                }
+                Section {
+                    if let stateResult, stateResult.isComplete {
+                        cardRow(for: stateResult)
+                    }
+                    if let medicalResult, medicalResult.isComplete {
+                        cardRow(for: medicalResult)
+                    }
+                }
+            }
+            .task {
+                withAnimation {
+                    presentingCapture = false
+                    presentingFinish = true
+                }
+            }
+        } else {
+            VStack {
+                ProgressView().progressViewStyle(.circular)
+                Text(NSLocalizedString("pulling", comment: ""))
+            }
+            .task {
+                withAnimation {
+                    presentingCapture = true
+                }
+            }
+        }
+    }
+    
+    @ViewBuilder
+    func cardRow(for model: CardScanResultModel) -> some View {
+        HStack {
+            Image(uiImage: UIImage(cgImage: model.image)).resizable().aspectRatio(1.3, contentMode: .fit)
+            if let type = model.type?.displayName {
+                Text(type)
+            }
+            Spacer()
+            Image(systemName: model.isComplete ? "checkmark.circle.fill" : "exclamationmark.triangle.fill").foregroundStyle(model.isComplete ? Color.gray : Color.red)
+        }
+        .frame(maxHeight: 66)
+    }
+    
+    @ViewBuilder
+    var deviceAppropriateCaptureView: some View {
 #if targetEnvironment(simulator)
         EmptyView()
             .task {
-                completion((stateID: .sampleStateID, medicalID: .completeSample))
+                stateResult = .sampleStateID
+                medicalResult = .incompleteSample
             }
 #else
-        DocumentCameraView(completion: completion)
+        DocumentCameraView(completion: { result in
+            stateResult = result.stateID
+            medicalResult = result.medicalID
+        })
 #endif
+    }
+    
+    @ViewBuilder
+    func completeFormView(with model: Binding<CardScanResultModel?>) -> some View {
+        MissingInfoView(model: model)
+            .presentationDetents([.large])
+    }
+    
+    @ViewBuilder
+    var confirmFormView: some View {
+        EmptyView()
+            .presentationDetents([.medium, .large])
+            .task {
+                completion((stateID: stateResult, medicalID: medicalResult))
+            }
     }
 }
 

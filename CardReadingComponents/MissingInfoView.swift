@@ -67,7 +67,10 @@ final class MissingInfoViewModel: ObservableObject {
 @available(iOS 17.0, *)
 struct MissingInfoView: View {
     
-    @ObservedObject private var viewModel: MissingInfoViewModel
+    @Binding
+    var model: CardScanResultModel?
+  
+    @StateObject private var viewModel: MissingInfoViewModel
     @State private var showNextStep: Bool = false
     
     @State private var stringValue: String = ""
@@ -88,13 +91,6 @@ struct MissingInfoView: View {
         NavigationStack {
             MissingInfoDetailsView(viewModel: viewModel)
         }
-    }
-}
-
-@available(iOS 17.0, *)
-struct MissingInfoView_Previews: PreviewProvider {
-    static var previews: some View {
-        MissingInfoView(viewModel: .init(expirationDate: Date(), issueingState: "", licenseID: "", dateOfBirth: Date(), selectedIDType: .medicalID, selectedDate: Date(), careTakerId: ""))
     }
 }
 
@@ -179,5 +175,14 @@ struct MissingInfoDetailsView: View {
                 .textFieldStyle(RoundedBorderTextFieldStyle())
                 .padding(.bottom, 10)
         }
+}
+
+@available(iOS 17.0, *)
+struct MissingInfoView_Previews: PreviewProvider {
+    @State
+    static var model: CardScanResultModel? = CardScanResultModel.incompleteSample
+    
+    static var previews: some View {
+        MissingInfoView(model: $model)
     }
 }
