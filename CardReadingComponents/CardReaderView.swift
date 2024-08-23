@@ -60,31 +60,30 @@ struct CardReaderView: View {
             }
         } else if (stateResult != nil || medicalResult != nil) {
             List {
-                Text("Oops, we need a little help")
-                if let stateResult {
-                    Section(NSLocalizedString("Photo ID", comment: "")) {
-                        if stateResult.isComplete {
-                            cardRow(for: stateResult)
-                        } else {
+                if !(stateResult?.isComplete ?? false) || !(medicalResult?.isComplete ?? false) {
+                    Section(NSLocalizedString("Needs attention", comment: "")) {
+                        if let stateResult, !stateResult.isComplete {
                             Button(action: {
                                 finishModel = stateResult
                             }, label: {
                                 cardRow(for: stateResult)
                             })
                         }
-                    }
-                }
-                if let medicalResult {
-                    Section(NSLocalizedString("Medical ID", comment: "")) {
-                        if medicalResult.isComplete {
-                            cardRow(for: medicalResult)
-                        } else {
+                        if let medicalResult, !medicalResult.isComplete {
                             Button(action: {
                                 finishModel = medicalResult
                             }, label: {
                                 cardRow(for: medicalResult)
                             })
                         }
+                    }
+                }
+                Section {
+                    if let stateResult, stateResult.isComplete {
+                        cardRow(for: stateResult)
+                    }
+                    if let medicalResult, medicalResult.isComplete {
+                        cardRow(for: medicalResult)
                     }
                 }
             }
@@ -111,11 +110,11 @@ struct CardReaderView: View {
     func cardRow(for model: CardScanResultModel) -> some View {
         HStack {
             Image(uiImage: UIImage(cgImage: model.image)).resizable().aspectRatio(1.3, contentMode: .fit)
-            if model.isComplete {
-                Text("No issues")
-            } else {
-                Text("Needs help")
+            if let type = model.type?.displayName {
+                Text(type)
             }
+            Spacer()
+            Image(systemName: model.isComplete ? "checkmark.circle.fill" : "exclamationmark.triangle.fill").foregroundStyle(model.isComplete ? Color.gray : Color.red)
         }
         .frame(maxHeight: 66)
     }
@@ -139,7 +138,7 @@ struct CardReaderView: View {
     @ViewBuilder
     func completeFormView(with model: Binding<CardScanResultModel?>) -> some View {
         MissingInfoView(model: model)
-            .presentationDetents([.medium, .large])
+            .presentationDetents([.large])
     }
     
     @ViewBuilder
